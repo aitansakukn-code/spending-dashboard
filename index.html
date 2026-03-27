@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>支出ダッシュボード v3</title>
+<title>マネーダッシュボード</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=DM+Mono:wght@400;500&display=swap');
@@ -17,248 +17,229 @@
   h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 2px; }
   .sub { color: var(--muted); font-size: 0.72rem; font-family: 'DM Mono', monospace; margin-bottom: 20px; }
   .nav { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
-  .nav-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 7px 14px; font-size: 0.78rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; transition: all 0.2s; }
+  .nav-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 7px 12px; font-size: 0.75rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; transition: all 0.2s; }
   .nav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .page { display: none; } .page.active { display: block; }
   .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
   .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-  .kpi.hi { border-color: var(--accent2); } .kpi.lo { border-color: var(--accent3); }
-  .kpi.avg { border-color: var(--accent); } .kpi.total { border-color: var(--accent4); }
-  .kpi.temp { border-color: var(--accent5); } .kpi.warn { border-color: var(--accent2); }
+  .kpi.inc { border-color: var(--accent5); } .kpi.total { border-color: var(--accent2); }
+  .kpi.save { border-color: var(--accent3); } .kpi.avg { border-color: var(--accent); }
+  .kpi.warn { border-color: var(--accent2); } .kpi.tip { border-color: var(--accent4); }
   .kpi-label { font-size: 0.65rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
-  .kpi-val { font-size: 1.05rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .kpi-val { font-size: 1.0rem; font-weight: 700; font-family: 'DM Mono', monospace; }
   .kpi-sub { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
   .card h2 { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
   canvas { max-height: 260px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-  .tab { background: var(--border); border: none; color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: 0.72rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; }
-  .tab.active { background: var(--accent); color: #fff; }
   .insight { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 11px 13px; font-size: 0.78rem; line-height: 1.65; margin-bottom: 8px; }
   .insight.warn { border-left-color: var(--accent2); }
   .insight.good { border-left-color: var(--accent3); }
   .insight.tip { border-left-color: var(--accent4); }
-  .insight.temp { border-left-color: var(--accent5); }
+  .insight.purple { border-left-color: var(--accent5); }
   .insight strong { color: var(--accent); }
   .insight.warn strong { color: var(--accent2); }
   .insight.good strong { color: var(--accent3); }
   .insight.tip strong { color: var(--accent4); }
-  .insight.temp strong { color: var(--accent5); }
+  .insight.purple strong { color: var(--accent5); }
   .badge { display: inline-block; background: var(--border); border-radius: 4px; padding: 1px 6px; font-size: 0.67rem; font-family: 'DM Mono', monospace; color: var(--muted); margin-bottom: 4px; }
+  .legend-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.68rem; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* 月別テーブル */
+  .month-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .month-table th { color: var(--muted); font-weight: 400; padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: right; font-family: 'DM Mono', monospace; font-size: 0.67rem; }
+  .month-table th:first-child { text-align: left; }
+  .month-table td { padding: 8px 4px; border-bottom: 1px solid var(--border); text-align: right; font-family: 'DM Mono', monospace; font-size: 0.72rem; }
+  .month-table td:first-child { text-align: left; font-family: 'Noto Sans JP', sans-serif; }
+  .month-table tr:last-child td { border-bottom: none; }
+  .pos { color: var(--accent3); }
+  .neg { color: var(--accent2); }
+
+  /* 月別カード */
   .month-cards { display: flex; flex-direction: column; gap: 8px; }
   .month-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-  .month-card.future { border-color: var(--accent4); }
-  .mc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .mc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
   .mc-month { font-weight: 700; font-size: 0.85rem; }
-  .mc-totals { text-align: right; }
-  .mc-total { font-family: 'DM Mono', monospace; font-size: 0.85rem; font-weight: 700; }
-  .mc-regular { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--accent3); }
-  .mc-note { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
-  .mc-temp-tag { display: inline-block; background: #2d1f4a; color: var(--accent5); border: 1px solid var(--accent5); border-radius: 4px; padding: 1px 6px; font-size: 0.67rem; margin-right: 4px; margin-bottom: 2px; }
-  .mc-warn-tag { display: inline-block; background: #2d1a1a; color: var(--accent2); border: 1px solid var(--accent2); border-radius: 4px; padding: 1px 6px; font-size: 0.67rem; margin-right: 4px; margin-bottom: 2px; }
-  .legend-row { display: flex; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: var(--muted); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
-  .sim-target { display: flex; gap: 8px; margin-bottom: 20px; }
-  .sim-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 10px; padding: 12px 6px; font-size: 0.8rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; text-align: center; transition: all 0.2s; }
+  .mc-income { font-family: 'DM Mono', monospace; font-size: 0.85rem; font-weight: 700; color: var(--accent5); }
+  .mc-bars { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  .mc-bar-row { display: flex; align-items: center; gap: 6px; }
+  .mc-bar-label { width: 52px; color: var(--muted); flex-shrink: 0; font-size: 0.67rem; }
+  .mc-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .mc-bar-fill { height: 100%; border-radius: 3px; }
+  .mc-bar-val { width: 58px; text-align: right; font-family: 'DM Mono', monospace; font-size: 0.67rem; }
+  .mc-footer { display: flex; justify-content: space-between; font-size: 0.72rem; padding-top: 8px; border-top: 1px solid var(--border); }
+  .mc-temp-tag { display: inline-block; background: #2d1f4a; color: var(--accent5); border: 1px solid var(--accent5); border-radius: 4px; padding: 1px 6px; font-size: 0.65rem; margin-right: 3px; margin-top: 4px; }
+
+  /* Sim */
+  .sim-target { display: flex; gap: 8px; margin-bottom: 16px; }
+  .sim-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 10px; padding: 10px 6px; font-size: 0.72rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; text-align: center; transition: all 0.2s; }
   .sim-btn.active { border-color: var(--accent3); color: var(--accent3); background: #1a2d1a; }
-  .sim-btn .sim-amount { font-size: 1.1rem; font-weight: 700; font-family: 'DM Mono', monospace; display: block; }
-  .sim-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .sim-btn .sim-amount { font-size: 1.0rem; font-weight: 700; font-family: 'DM Mono', monospace; display: block; }
+  .sim-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); }
   .sim-row:last-child { border-bottom: none; }
-  .sim-icon { font-size: 1.1rem; width: 28px; text-align: center; }
-  .sim-name { flex: 1; font-size: 0.8rem; }
-  .sim-bar-wrap { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-  .sim-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
-  .sim-val { font-family: 'DM Mono', monospace; font-size: 0.8rem; font-weight: 700; width: 60px; text-align: right; }
-  .sim-summary { background: #1a2d1a; border: 1px solid var(--accent3); border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center; }
+  .sim-icon { font-size: 0.95rem; width: 22px; text-align: center; }
+  .sim-name { flex: 1; font-size: 0.75rem; }
+  .sim-bw { width: 60px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .sim-bf { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .sim-val { font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 700; width: 62px; text-align: right; }
+  .sim-summary { background: #1a2d1a; border: 1px solid var(--accent3); border-radius: 12px; padding: 16px; margin-top: 14px; text-align: center; }
   .sim-summary .label { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
-  .sim-summary .val { font-size: 1.4rem; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--accent3); }
-  .sim-summary .ssub { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .sim-summary .val { font-size: 1.3rem; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--accent3); }
+  .sim-summary .ssub { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body>
 
-<h1>💳 支出ダッシュボード</h1>
-<p class="sub">2025年4月〜2026年3月 / 12ヶ月 / 定期代・JR値上げ反映版</p>
+<h1>💳 マネーダッシュボード</h1>
+<p class="sub">2025年4月〜2026年3月 / 全支出・収入・実質収支</p>
 
 <div class="nav">
   <button class="nav-btn active" onclick="showPage('overview', this)">概要</button>
-  <button class="nav-btn" onclick="showPage('monthly', this)">月別メモ</button>
-  <button class="nav-btn" onclick="showPage('trend', this)">トレンド</button>
+  <button class="nav-btn" onclick="showPage('breakdown', this)">支出内訳</button>
+  <button class="nav-btn" onclick="showPage('monthly', this)">月別詳細</button>
   <button class="nav-btn" onclick="showPage('simulation', this)">節約シミュ</button>
 </div>
 
 <!-- 概要 -->
 <div class="page active" id="page-overview">
   <div class="kpi-grid">
+    <div class="kpi inc">
+      <div class="kpi-label">年間収入</div>
+      <div class="kpi-val" style="color:var(--accent5)">¥4,648,745</div>
+      <div class="kpi-sub">給料＋賞与</div>
+    </div>
     <div class="kpi total">
-      <div class="kpi-label">年間合計（実績）</div>
-      <div class="kpi-val" style="color:var(--accent4)">¥1,348,891</div>
-      <div class="kpi-sub">4月〜3月</div>
+      <div class="kpi-label">年間支出合計（推定）</div>
+      <div class="kpi-val" style="color:var(--accent2)">¥4,552,080</div>
+      <div class="kpi-sub">全費目込み</div>
     </div>
     <div class="kpi avg">
-      <div class="kpi-label">月平均（実績）</div>
-      <div class="kpi-val" style="color:var(--accent)">¥112,407</div>
-      <div class="kpi-sub">定期代含む</div>
+      <div class="kpi-label">月平均支出（推定）</div>
+      <div class="kpi-val" style="color:var(--accent)">¥379,340</div>
+      <div class="kpi-sub">固定費+カード2枚+現金</div>
     </div>
     <div class="kpi warn">
-      <div class="kpi-label">JR値上げ影響</div>
-      <div class="kpi-val" style="color:var(--accent2)">+¥1,810/月</div>
-      <div class="kpi-sub">4月〜 年間+¥21,720</div>
-    </div>
-    <div class="kpi lo">
-      <div class="kpi-label">定期代（値上げ後）</div>
-      <div class="kpi-val" style="color:var(--accent3)">¥17,060</div>
-      <div class="kpi-sub">3月14日〜 旧¥15,250</div>
+      <div class="kpi-label">実質収支</div>
+      <div class="kpi-val" style="color:var(--accent2)">ほぼ±0</div>
+      <div class="kpi-sub">現金支出で消化</div>
     </div>
   </div>
 
   <div class="card">
-    <h2>月別合計（通常 vs 一時支出）</h2>
+    <h2>月別 収入 vs 全支出</h2>
     <div class="legend-row">
-      <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>通常支出</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div>一時支出</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#3fb950;border-radius:50%"></div>通常支出のみ</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div>収入</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>メインカード</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>別カード</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>固定費</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4a5568"></div>推定現金</div>
     </div>
-    <canvas id="totalChart"></canvas>
+    <canvas id="overviewChart"></canvas>
   </div>
 
   <div class="insight warn">
-    <div class="badge">JR値上げ 2026/3/14〜</div><br>
-    足立小台→渋谷の定期代が<strong>¥15,250→¥17,060</strong>に（約12%増）。月<strong>+¥1,810</strong>、年間<strong>+¥21,720</strong>の負担増。来月4月から新定期代が適用されます。
-  </div>
-  <div class="insight tip">
-    <div class="badge">解約済み</div><br>
-    GTOWIZARDを解約。年間<strong>約¥92,000</strong>削減確定🎉 値上げ分を差し引いても年間<strong>約¥70,000</strong>のプラス。
+    <div class="badge">実態</div><br>
+    収入約¥387K/月に対し、固定費だけで<strong>約¥165K</strong>（家賃¥74K＋奨学金¥30K＋光熱費等¥61K）かかっています。残り約¥222Kでカード2枚＋現金をやりくりしている状態。
   </div>
   <div class="insight good">
-    <div class="badge">通常支出の実力値</div><br>
-    一時支出を除いた通常支出の月平均は<strong>約¥98,760</strong>。定期代を毎月の固定費として含めた数字です。
+    <div class="badge">削れる固定費</div><br>
+    奨学金（¥30,000）は返済義務なので削れませんが、それ以外の固定費の見直し余地はほぼなし。<strong>削れるのはカード支出と現金支出</strong>が主戦場です。
+  </div>
+  <div class="insight tip">
+    <div class="badge">GTOWIZARD解約済み</div><br>
+    メインカードから月<strong>¥8,000削減確定</strong>。年間¥96,000のインパクト。
   </div>
 </div>
 
-<!-- 月別メモ -->
+<!-- 支出内訳 -->
+<div class="page" id="page-breakdown">
+  <div class="card">
+    <h2>月別 支出内訳（積み上げ）</h2>
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>メインカード</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>別カード</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>家賃</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div>奨学金</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div>光熱費等</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4a5568"></div>推定現金</div>
+    </div>
+    <canvas id="stackChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>月別 支出合計と収入の比較</h2>
+    <canvas id="compareChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>月別 支出詳細テーブル</h2>
+    <div style="overflow-x:auto">
+      <table class="month-table" id="detailTable"></table>
+    </div>
+  </div>
+</div>
+
+<!-- 月別詳細 -->
 <div class="page" id="page-monthly">
   <div class="month-cards" id="monthCards"></div>
 </div>
 
-<!-- トレンド -->
-<div class="page" id="page-trend">
-  <div class="card">
-    <h2>定期代の推移（値上げ前後）</h2>
-    <canvas id="teikiChart"></canvas>
-  </div>
-  <div class="card">
-    <h2>通常 vs 一時支出の推移</h2>
-    <canvas id="stackChart"></canvas>
-  </div>
-  <div class="card">
-    <h2>注目カテゴリの月別推移</h2>
-    <div class="tabs">
-      <button class="tab active" onclick="showLine('drink', this)">飲み会</button>
-      <button class="tab" onclick="showLine('taxi', this)">タクシー</button>
-      <button class="tab" onclick="showLine('conbini', this)">コンビニ</button>
-    </div>
-    <canvas id="lineChart"></canvas>
-  </div>
-</div>
-
-<!-- シミュレーション -->
+<!-- 節約シミュ -->
 <div class="page" id="page-simulation">
-  <p style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">※値上げ後の定期代（¥17,060）を含む通常支出ベース</p>
-  <p style="font-size:0.72rem;color:var(--accent2);margin-bottom:12px">GTOWIZARD解約済みの新ベースで試算</p>
+  <p style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">メインカード支出を削ると手元にどれだけ残るか</p>
+  <p style="font-size:0.72rem;color:var(--accent2);margin-bottom:12px">月収平均¥346,115（賞与除く）/ 固定費¥165,590 ベース</p>
   <div class="sim-target">
     <button class="sim-btn" onclick="setSim(50000, this)"><span class="sim-amount">¥5万</span>きつめ</button>
     <button class="sim-btn active" onclick="setSim(90000, this)"><span class="sim-amount">¥9万</span>現実的</button>
-    <button class="sim-btn" onclick="setSim(100000, this)"><span class="sim-amount">¥10万</span>余裕あり</button>
+    <button class="sim-btn" onclick="setSim(100000, this)"><span class="sim-amount">¥10万</span>余裕</button>
   </div>
   <div class="card">
-    <h2>各項目の予算配分</h2>
+    <h2>メインカード内訳の予算配分</h2>
     <div id="simRows"></div>
   </div>
   <div class="sim-summary" id="simSummary"></div>
-  <div style="margin-top:16px">
-    <div class="insight good">
-      <div class="badge">月9万円プランの実現性</div><br>
-      GTOWIZARD解約（▲8,000円）＋飲み会月1回（▲10,000円）＋コンビニ食事→スーパー（▲3,000円）＋タクシー削減（▲2,000円）で<strong>月▲23,000円</strong>削減。JR値上げ（+1,810円）を差し引いても<strong>月約9万円</strong>は射程圏内。
-    </div>
+  <div style="margin-top:14px">
     <div class="insight warn">
-      <div class="badge">注意：来月からの固定費</div><br>
-      4月から定期代が<strong>¥17,060/月</strong>に。タバコ（¥20,000）と合わせると固定費だけで<strong>¥37,060</strong>。月9万円プランでは残り¥52,940で生活することになります。
+      <div class="badge">現実的な目標</div><br>
+      固定費¥165,590＋別カード平均¥31,890＋メインカード¥90,000 = 月支出<strong>¥287,480</strong>。月収¥346,115との差額<strong>¥58,635が手元に残る</strong>計算（現状はほぼ0）。
+    </div>
+    <div class="insight good">
+      <div class="badge">賞与は貯金へ</div><br>
+      7月賞与（¥105K）・1月賞与（¥338K）を全額貯金すれば年間<strong>約¥443K</strong>の貯金が作れます。
     </div>
   </div>
 </div>
 
 <script>
 const months = ['4月','5月','6月','7月','8月','9月','10月','11月','12月','1月','2月','3月'];
+const income =    [396706,294885,397335,450910,350598,346115,349843,347854,394832,681996,302622,335044];
+const mainCard =  [54697, 98985, 88223,144263,146818,155123,136050,143661,160633, 99575,132715,122097];
+const subCard =   [26557, 38557, 47631, 34583, 27657, 72680, 29531, 13505, 21226,  3557, 53485, 13714];
+const rent =      [74090, 74090, 74090, 74090, 74090, 74090, 74090, 74090, 74090, 74090, 74090, 86090];
+const scholarship=[30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000, 30000];
+const utilities = [60500, 60500, 60500, 60500, 60500, 60500, 60500, 60500, 60500, 60500, 60500, 60500];
+const knownTotal = months.map((_,i) => mainCard[i]+subCard[i]+rent[i]+scholarship[i]+utilities[i]);
+const cash =       months.map((_,i) => Math.max(income[i]-knownTotal[i], 0));
+const totalSpend = months.map((_,i) => knownTotal[i]+cash[i]);
+const balance =    months.map((_,i) => income[i]-totalSpend[i]);
 
-// 定期代：1〜3月は15,250円、それ以外は実際の交通費に含まれている
-// ※4月〜12月は定期代が交通費データの中に含まれているため分離が難しい
-// 1〜3月: Suicaチャージの15,250円が定期購入と判定
-const teikiOld = 15250;
-const teikiNew = 17060;
-// 定期代の月別（1月〜3月: 旧, 4月〜: 新）
-// グラフ表示用：実績12ヶ月の定期代推定値
-const teikiByMonth = [
-  // 4〜12月は交通費データに含まれる（推定15,250円/月）
-  15250, 15250, 15250, 15250, 15250, 15250, 15250, 15250, 15250,
-  // 1〜3月: 実際のSuicaチャージで確認できた定期購入
-  15250, 15250, 15250  // 3月14日から値上げだが3月は旧定期の可能性あり
-];
-
-const totals = [54697,98985,88223,144263,146818,155123,136050,143661,160633,99575,132715,122097];
-
-const tempSpend = [
-  { month: 0, amount: 0,     items: [] },
-  { month: 1, amount: 28790, items: ['GW帰省・新幹線往復 約¥28,790'] },
-  { month: 2, amount: 0,     items: [] },
-  { month: 3, amount: 26200, items: ['LUCIS GARDEN ¥18,000', '同日タクシー ¥8,200'] },
-  { month: 4, amount: 47580, items: ['お盆帰省・新幹線 約¥36,580', '帰省中飲食 約¥18,148'] },
-  { month: 5, amount: 11500, items: ['au機種変更 約¥11,500'] },
-  { month: 6, amount: 19550, items: ['海外旅行フィリピン 約¥5,800', '美容院 ¥13,750'] },
-  { month: 7, amount: 0,     items: [] },
-  { month: 8, amount: 47980, items: ['年末帰省・新幹線＋JR西 約¥30,730', '美容院 ¥8,250', '帰省中飲食 ¥9,000'] },
-  { month: 9, amount: 15250, items: ['定期購入（初回） ¥15,250'] },
-  { month: 10, amount: 12650, items: ['美容院 ¥12,650'] },
-  { month: 11, amount: 0,    items: [] },
-];
-
-const tempAmounts = tempSpend.map(t => t.amount);
-const regularAmounts = totals.map((t, i) => t - tempAmounts[i]);
-const regularAvg = Math.round(regularAmounts.reduce((a,b)=>a+b,0)/12);
+const tempAmounts = [0,28790,0,26200,47580,11500,19550,0,47980,15250,12650,0];
 
 const monthNotes = [
-  { emoji: '🌱', label: '転職直後', note: '転職直後で生活費が少なめ。外出・飲み会もまだ少ない時期。定期代：¥15,250/月。', future: false },
-  { emoji: '✈️', label: 'GW帰省', note: '新幹線往復で約¥28,790の一時支出。定期代：¥15,250/月。', future: false },
-  { emoji: '☔', label: '通常月', note: '特に大きなイベントなし。比較的落ち着いた月。定期代：¥15,250/月。', future: false },
-  { emoji: '🎉', label: 'デカい遊び', note: 'LUCIS GARDEN（¥18,000）＋タクシー（¥8,200）の大きな一夜。パルコ（¥14,300）も重なった月。定期代：¥15,250/月。', future: false },
-  { emoji: '🏠', label: 'お盆帰省', note: 'お盆で帰省。新幹線3本で約¥36,580。12ヶ月で一時支出が最大の月。定期代：¥15,250/月。', future: false },
-  { emoji: '📱', label: '機種変更', note: 'au機種変更（約¥11,500）。飲み会も多めの月。定期代：¥15,250/月。', future: false },
-  { emoji: '🌏', label: '海外旅行＋美容院', note: 'フィリピン旅行＋美容院が重なった月。一時支出を除くと普通の月。定期代：¥15,250/月。', future: false },
-  { emoji: '🍺', label: '飲み会ピーク', note: '串だおれ・ジャロウ・ハンベエで3回各¥1万円超。12ヶ月で飲み会が最も多い月。定期代：¥15,250/月。', future: false },
-  { emoji: '🎍', label: '年末帰省', note: '年末帰省で新幹線＋JR西日本が約¥30,730。美容院・帰省中飲食を含め一時支出が約¥47,980。定期代：¥15,250/月。', future: false },
-  { emoji: '🚃', label: '定期購入（初回）', note: '足立小台〜渋谷の通勤定期を初購入（¥15,250）。以降毎月の固定費に。', future: false },
-  { emoji: '💇', label: '美容院', note: '美容院（¥12,650）の月。コンビニ支出が急増傾向。定期代：¥15,250/月。', future: false },
-  { emoji: '📊', label: 'GTOWIZARD解約・JR値上げ', note: 'GTOWIZARDを解約（▲¥8,000/月〜）。3月14日よりJR運賃改定、次回定期更新から¥17,060に値上がり。', future: false },
+  { emoji:'🌱', label:'転職直後',        temp:['転職直後で出費少なめ'] },
+  { emoji:'✈️', label:'GW帰省',          temp:['GW帰省 ¥28,790'] },
+  { emoji:'☔', label:'通常月',           temp:[] },
+  { emoji:'🎉', label:'夏賞与＋デカい遊び', temp:['夏賞与¥104,795','LUCIS GARDEN ¥18,000'] },
+  { emoji:'🏠', label:'お盆帰省',         temp:['お盆帰省 ¥36,580'] },
+  { emoji:'📱', label:'機種変更',          temp:['au機種変更 ¥11,500','別カード最高月¥72,680'] },
+  { emoji:'🌏', label:'海外旅行＋美容院', temp:['フィリピン旅行','美容院 ¥13,750'] },
+  { emoji:'🍺', label:'飲み会ピーク',     temp:['飲み会3回 計¥44,000'] },
+  { emoji:'🎍', label:'年末帰省',          temp:['年末帰省 ¥30,730','美容院 ¥8,250'] },
+  { emoji:'🎁', label:'冬賞与',            temp:['冬賞与¥337,764','定期初購入¥15,250'] },
+  { emoji:'💇', label:'美容院',            temp:['美容院 ¥12,650','別カード¥53,485と高め'] },
+  { emoji:'📊', label:'GTOWIZARD解約',   temp:['GTOWIZARD解約済み','JR定期値上げ'] },
 ];
-
-const palette = {
-  '外食':'#ff9f6c','コンビニ':'#ff6c8a','交通':'#58a6ff','飲み会':'#f85149',
-  '美容':'#bc8cff','ショッピング':'#3fb950','タバコ':'#d29922','通販等':'#6cb8ff','その他':'#4a5568'
-};
-const icons = { '外食':'🍜','コンビニ':'🏪','交通':'🚃','飲み会':'🍺','美容':'💇','ショッピング':'🛍️','タバコ':'🚬','通販等':'📦','その他':'📌' };
-
-const cats = {
-  '外食':        [13530,12560,11311,15772,10910,22166,22851,21570,18370,14418,19018,16496],
-  'コンビニ':    [182,0,1298,550,1556,4686,13065,10518,12686,15677,25432,25695],
-  '交通（定期含）':[15700,33970,32000,37700,54800,37500,31900,32400,58330,26800,23850,21050],
-  '飲み会':      [13210,13172,10980,34672,26338,41896,16748,43921,9435,0,8549,2490],
-  '美容':        [0,6710,0,8250,0,0,13750,0,8250,0,12650,0],
-  'ショッピング': [3098,0,13961,23350,0,14937,6226,4020,15720,6226,13113,15398],
-  'タバコ':      [18000,18000,18000,20000,20000,20000,20000,20000,20000,20000,20000,20000],
-  '通販等':      [7634,7376,7328,7330,16058,7515,7526,7838,7935,7971,7877,10601],
-  'その他':      [0,7197,3345,9239,17156,6423,3984,3394,9907,8483,1326,10367],
-};
 
 function showPage(id, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -267,165 +248,157 @@ function showPage(id, btn) {
   btn.classList.add('active');
 }
 
-// Total chart
-new Chart(document.getElementById('totalChart'), {
+const maxVal = Math.max(...income);
+
+// Overview chart
+new Chart(document.getElementById('overviewChart'), {
   type: 'bar',
   data: {
     labels: months,
     datasets: [
-      { label: '通常支出', data: regularAmounts, backgroundColor: '#58a6ff88', borderColor: '#58a6ff', borderWidth: 1, borderRadius: 4, borderSkipped: false, stack: 'stack' },
-      { label: '一時支出', data: tempAmounts, backgroundColor: '#bc8cff88', borderColor: '#bc8cff', borderWidth: 1, borderRadius: 4, borderSkipped: false, stack: 'stack' },
-      { label: '通常支出のみ', data: regularAmounts, type: 'line', borderColor: '#3fb950', backgroundColor: 'transparent', pointBackgroundColor: '#3fb950', pointRadius: 4, tension: 0.3, borderWidth: 2 }
+      { label:'収入', data:income, backgroundColor:'#bc8cff55', borderColor:'#bc8cff', borderWidth:1, borderRadius:3, borderSkipped:false },
+      { label:'メインカード', data:mainCard, backgroundColor:'#f8514966', borderColor:'#f85149', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'別カード', data:subCard, backgroundColor:'#d2992266', borderColor:'#d29922', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'固定費', data:utilities.map((_,i)=>rent[i]+scholarship[i]+utilities[i]), backgroundColor:'#58a6ff44', borderColor:'#58a6ff', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'推定現金', data:cash, backgroundColor:'#4a556844', borderColor:'#4a5568', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
     ]
   },
   options: {
     plugins: {
-      legend: { labels: { color: '#e6edf3', font: { size: 10 }, boxWidth: 12 } },
-      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}` } }
+      legend: { labels: { color:'#e6edf3', font:{ size:10 }, boxWidth:10 } },
+      tooltip: { callbacks: { label: ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}` } }
     },
     scales: {
-      x: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-      y: { stacked: true, ticks: { color: '#8b949e', callback: v => `¥${(v/10000).toFixed(0)}万`, font: { size: 10 } }, grid: { color: '#21262d' } }
+      x: { stacked:false, ticks:{ color:'#8b949e', font:{ size:9 } }, grid:{ color:'#21262d' } },
+      y: { ticks:{ color:'#8b949e', callback: v=>`¥${(v/10000).toFixed(0)}万`, font:{ size:10 } }, grid:{ color:'#21262d' } }
     }
   }
 });
 
-// 定期代チャート
-const teikiData = [
-  15250,15250,15250,15250,15250,15250,15250,15250,15250,15250,15250,
-  15250 // 3月は旧定期（3/14〜値上げだが定期は月途中で切り替わらない）
-];
-const teikiFuture = [null,null,null,null,null,null,null,null,null,null,null,null,17060]; // 4月〜
-
-new Chart(document.getElementById('teikiChart'), {
-  type: 'line',
-  data: {
-    labels: [...months, '4月\n(来月〜)'],
-    datasets: [
-      {
-        label: '定期代（実績）',
-        data: [...teikiData, null],
-        borderColor: '#58a6ff', backgroundColor: '#58a6ff22',
-        fill: true, tension: 0, pointRadius: 4, borderWidth: 2,
-      },
-      {
-        label: '定期代（値上げ後）',
-        data: teikiFuture,
-        borderColor: '#f85149', backgroundColor: '#f8514922',
-        fill: false, tension: 0, pointRadius: 6, borderWidth: 2,
-        borderDash: [6, 3],
-      }
-    ]
-  },
-  options: {
-    plugins: {
-      legend: { labels: { color: '#e6edf3', font: { size: 10 }, boxWidth: 12 } },
-      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ¥${ctx.raw?.toLocaleString() ?? '-'}` } },
-      annotation: {}
-    },
-    scales: {
-      x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: '#21262d' } },
-      y: {
-        min: 14000, max: 18000,
-        ticks: { color: '#8b949e', callback: v => `¥${v.toLocaleString()}`, font: { size: 10 } },
-        grid: { color: '#21262d' }
-      }
-    }
-  }
-});
-
-// Stack
+// Stack chart
 new Chart(document.getElementById('stackChart'), {
   type: 'bar',
   data: {
     labels: months,
     datasets: [
-      { label: '通常支出', data: regularAmounts, backgroundColor: '#58a6ff88', borderColor: '#58a6ff', borderWidth: 1, borderRadius: 4, borderSkipped: false, stack: 'stack' },
-      { label: '一時支出', data: tempAmounts, backgroundColor: '#bc8cff88', borderColor: '#bc8cff', borderWidth: 1, borderRadius: 4, borderSkipped: false, stack: 'stack' },
+      { label:'メインカード', data:mainCard, backgroundColor:'#f8514988', borderColor:'#f85149', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'別カード', data:subCard, backgroundColor:'#d2992288', borderColor:'#d29922', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'家賃', data:rent, backgroundColor:'#58a6ff88', borderColor:'#58a6ff', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'奨学金', data:scholarship, backgroundColor:'#3fb95088', borderColor:'#3fb950', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'光熱費等', data:utilities, backgroundColor:'#bc8cff88', borderColor:'#bc8cff', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
+      { label:'推定現金', data:cash, backgroundColor:'#4a556888', borderColor:'#4a5568', borderWidth:1, borderRadius:3, borderSkipped:false, stack:'s' },
     ]
   },
   options: {
     plugins: {
-      legend: { labels: { color: '#e6edf3', font: { size: 10 }, boxWidth: 12 } },
-      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}` } }
+      legend: { labels: { color:'#e6edf3', font:{ size:10 }, boxWidth:10 } },
+      tooltip: { callbacks: { label: ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}` } }
     },
     scales: {
-      x: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-      y: { stacked: true, ticks: { color: '#8b949e', callback: v => `¥${(v/10000).toFixed(0)}万`, font: { size: 10 } }, grid: { color: '#21262d' } }
+      x: { stacked:true, ticks:{ color:'#8b949e', font:{ size:9 } }, grid:{ color:'#21262d' } },
+      y: { stacked:true, ticks:{ color:'#8b949e', callback: v=>`¥${(v/10000).toFixed(0)}万`, font:{ size:10 } }, grid:{ color:'#21262d' } }
     }
   }
 });
 
-// Line
-let lineChart;
-const lineData = {
-  drink:   { label: '飲み会', data: cats['飲み会'], color: '#f85149' },
-  taxi:    { label: 'タクシー', data: [14500,5300,3300,11500,7200,3200,4900,4400,3600,2800,3200,1700], color: '#58a6ff' },
-  conbini: { label: 'コンビニ', data: cats['コンビニ'], color: '#ff6c8a' },
-};
-function buildLine(key) {
-  if (lineChart) lineChart.destroy();
-  const d = lineData[key];
-  lineChart = new Chart(document.getElementById('lineChart'), {
-    type: 'line',
-    data: {
-      labels: months,
-      datasets: [{ label: d.label, data: d.data, borderColor: d.color, backgroundColor: d.color + '22', fill: true, tension: 0.3, pointRadius: 4 }]
+// Compare chart
+new Chart(document.getElementById('compareChart'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label:'収入', data:income, backgroundColor:'#bc8cff44', borderColor:'#bc8cff', borderWidth:1, borderRadius:3, borderSkipped:false },
+      { label:'支出合計', data:totalSpend, backgroundColor:'#f8514944', borderColor:'#f85149', borderWidth:1, borderRadius:3, borderSkipped:false },
+    ]
+  },
+  options: {
+    plugins: {
+      legend: { labels: { color:'#e6edf3', font:{ size:10 }, boxWidth:10 } },
+      tooltip: { callbacks: { label: ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}` } }
     },
-    options: {
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `¥${ctx.raw.toLocaleString()}` } } },
-      scales: {
-        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e', callback: v => `¥${(v/10000).toFixed(1)}万`, font: { size: 10 } }, grid: { color: '#21262d' } }
-      }
+    scales: {
+      x: { ticks:{ color:'#8b949e', font:{ size:9 } }, grid:{ color:'#21262d' } },
+      y: { ticks:{ color:'#8b949e', callback: v=>`¥${(v/10000).toFixed(0)}万`, font:{ size:10 } }, grid:{ color:'#21262d' } }
     }
-  });
-}
-buildLine('drink');
-function showLine(key, btn) {
-  document.querySelectorAll('#page-trend .tabs .tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  buildLine(key);
-}
+  }
+});
+
+// Detail table
+const table = document.getElementById('detailTable');
+table.innerHTML = `<tr>
+  <th>月</th><th>収入</th><th>メイン</th><th>別カード</th><th>固定費</th><th>合計</th>
+</tr>`;
+months.forEach((m,i) => {
+  const fixed = rent[i]+scholarship[i]+utilities[i];
+  const total = mainCard[i]+subCard[i]+fixed+cash[i];
+  const diff = income[i] - total;
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>${m}</td>
+    <td class="pos">¥${(income[i]/10000).toFixed(0)}万</td>
+    <td>¥${(mainCard[i]/10000).toFixed(1)}万</td>
+    <td>¥${(subCard[i]/10000).toFixed(1)}万</td>
+    <td>¥${(fixed/10000).toFixed(1)}万</td>
+    <td class="${diff>=0?'pos':'neg'}">¥${(total/10000).toFixed(0)}万</td>
+  `;
+  table.appendChild(row);
+});
 
 // Month cards
 const cardContainer = document.getElementById('monthCards');
-months.forEach((m, i) => {
+months.forEach((m,i) => {
   const note = monthNotes[i];
-  const temp = tempAmounts[i];
-  const regular = regularAmounts[i];
-  const total = totals[i];
-  const tempItems = tempSpend[i].items;
+  const fixed = rent[i]+scholarship[i]+utilities[i];
+  const total = mainCard[i]+subCard[i]+fixed+cash[i];
+  const bal = income[i]-total;
   const card = document.createElement('div');
-  card.className = 'month-card' + (note.future ? ' future' : '');
+  card.className = 'month-card';
   card.innerHTML = `
     <div class="mc-header">
       <div class="mc-month">${note.emoji} ${m}（${note.label}）</div>
-      <div class="mc-totals">
-        <div class="mc-total">¥${total.toLocaleString()}</div>
-        ${temp > 0 ? `<div class="mc-regular">通常 ¥${regular.toLocaleString()}</div>` : ''}
+      <div class="mc-income">¥${income[i].toLocaleString()}</div>
+    </div>
+    <div class="mc-bars">
+      <div class="mc-bar-row">
+        <span class="mc-bar-label" style="color:#f85149">メイン</span>
+        <div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(mainCard[i]/income[i]*100)}%;background:#f85149"></div></div>
+        <span class="mc-bar-val" style="color:#f85149">¥${(mainCard[i]/10000).toFixed(1)}万</span>
+      </div>
+      <div class="mc-bar-row">
+        <span class="mc-bar-label" style="color:#d29922">別カード</span>
+        <div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(subCard[i]/income[i]*100)}%;background:#d29922"></div></div>
+        <span class="mc-bar-val" style="color:#d29922">¥${(subCard[i]/10000).toFixed(1)}万</span>
+      </div>
+      <div class="mc-bar-row">
+        <span class="mc-bar-label" style="color:#58a6ff">固定費</span>
+        <div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(fixed/income[i]*100)}%;background:#58a6ff"></div></div>
+        <span class="mc-bar-val" style="color:#58a6ff">¥${(fixed/10000).toFixed(1)}万</span>
+      </div>
+      <div class="mc-bar-row">
+        <span class="mc-bar-label" style="color:#4a5568">現金</span>
+        <div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(cash[i]/income[i]*100)}%;background:#4a5568"></div></div>
+        <span class="mc-bar-val" style="color:#8b949e">¥${(cash[i]/10000).toFixed(1)}万</span>
       </div>
     </div>
-    <div class="mc-note">${note.note}</div>
-    ${tempItems.length > 0 ? `<div style="margin-top:8px">${tempItems.map(item => `<span class="mc-temp-tag">📌 ${item}</span>`).join('')}</div>` : ''}
-    ${i === 11 ? `<div style="margin-top:8px"><span class="mc-warn-tag">⚠️ 次回定期更新から¥17,060に値上がり</span></div>` : ''}
+    <div class="mc-footer">
+      <span style="color:var(--muted)">支出合計 ¥${total.toLocaleString()}</span>
+      <span style="color:${bal>=0?'var(--accent3)':'var(--accent2)'}">収支 ${bal>=0?'+':''}¥${bal.toLocaleString()}</span>
+    </div>
+    ${note.temp.length > 0 ? `<div style="margin-top:6px">${note.temp.map(t=>`<span class="mc-temp-tag">📌 ${t}</span>`).join('')}</div>` : ''}
   `;
   cardContainer.appendChild(card);
 });
 
-// Simulation（GTOWIZARD解約済み・値上げ後ベース）
-// 新しいベース平均：通常支出平均 - GTOWIZARD(8000) + 値上げ分(1810) = 98,760 - 8,000 + 1,810 = 92,570
-const newRegularAvg = 92570;
+// Simulation
+const avgIncome = 346115;
+const avgFixed = 165590;
+const avgSubCard = 31890;
+const palette = { '交通（定期含）':'#58a6ff','タバコ':'#d29922','飲み会':'#f85149','外食':'#ff9f6c','コンビニ':'#ff6c8a','ショッピング':'#3fb950','その他':'#4a5568','美容':'#bc8cff','通販等':'#6cb8ff' };
+const icons = { '交通（定期含）':'🚃','タバコ':'🚬','飲み会':'🍺','外食':'🍜','コンビニ':'🏪','ショッピング':'🛍️','その他':'📌','美容':'💇','通販等':'📦' };
 const simCats = [
-  { label: '交通（定期含）', ratio: 0.22, color: '#58a6ff' },
-  { label: 'タバコ',         ratio: 0.215, color: '#d29922' },
-  { label: '飲み会',         ratio: 0.14, color: '#f85149' },
-  { label: '外食',           ratio: 0.145, color: '#ff9f6c' },
-  { label: 'コンビニ',       ratio: 0.09, color: '#ff6c8a' },
-  { label: 'ショッピング',   ratio: 0.07, color: '#3fb950' },
-  { label: 'その他',         ratio: 0.07, color: '#4a5568' },
-  { label: '美容',           ratio: 0.03, color: '#bc8cff' },
-  { label: '通販等',         ratio: 0.02, color: '#6cb8ff' },
+  { label:'交通（定期含）', ratio:0.22 }, { label:'タバコ', ratio:0.215 }, { label:'飲み会', ratio:0.14 },
+  { label:'外食', ratio:0.145 }, { label:'コンビニ', ratio:0.09 }, { label:'ショッピング', ratio:0.07 },
+  { label:'その他', ratio:0.07 }, { label:'美容', ratio:0.03 }, { label:'通販等', ratio:0.02 },
 ];
 
 function setSim(target, btn) {
@@ -436,25 +409,26 @@ function setSim(target, btn) {
 function renderSim(target) {
   const rows = document.getElementById('simRows');
   rows.innerHTML = '';
-  const maxRatio = Math.max(...simCats.map(c => c.ratio));
+  const maxRatio = Math.max(...simCats.map(c=>c.ratio));
   simCats.forEach(cat => {
     const val = Math.round(target * cat.ratio);
-    const barW = Math.round((cat.ratio / maxRatio) * 100);
     const row = document.createElement('div');
     row.className = 'sim-row';
     row.innerHTML = `
-      <span class="sim-icon">${icons[cat.label] || '📌'}</span>
+      <span class="sim-icon">${icons[cat.label]||'📌'}</span>
       <span class="sim-name">${cat.label}</span>
-      <div class="sim-bar-wrap"><div class="sim-bar" style="width:${barW}%;background:${cat.color}"></div></div>
-      <span class="sim-val" style="color:${cat.color}">¥${val.toLocaleString()}</span>
+      <div class="sim-bw"><div class="sim-bf" style="width:${Math.round(cat.ratio/maxRatio*100)}%;background:${palette[cat.label]}"></div></div>
+      <span class="sim-val" style="color:${palette[cat.label]}">¥${val.toLocaleString()}</span>
     `;
     rows.appendChild(row);
   });
-  const saving = newRegularAvg - target;
+  const remaining = avgIncome - avgFixed - avgSubCard - target;
+  const currentRemaining = avgIncome - avgFixed - avgSubCard - 112407;
+  const diff = remaining - currentRemaining;
   document.getElementById('simSummary').innerHTML = `
-    <div class="label">新ベース月平均（¥${newRegularAvg.toLocaleString()}）との差額</div>
-    <div class="val">${saving > 0 ? '▲' : '+'}¥${Math.abs(saving).toLocaleString()}/月</div>
-    <div class="ssub">年間 ${saving > 0 ? '▲' : '+'}¥${Math.abs(saving*12).toLocaleString()} の${saving > 0 ? '節約' : '増加'}</div>
+    <div class="label">月収¥${avgIncome.toLocaleString()} - 固定費¥${avgFixed.toLocaleString()} - 別カード¥${avgSubCard.toLocaleString()} - メインカード¥${target.toLocaleString()}</div>
+    <div class="val">月¥${remaining.toLocaleString()} 手元に残る</div>
+    <div class="ssub">現状より月${diff>=0?'+':''}¥${diff.toLocaleString()}の${diff>=0?'改善':'悪化'} / 賞与は別途</div>
   `;
 }
 renderSim(90000);
