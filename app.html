@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マネーアプリ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap');
+  :root {
+    --bg:#080c10;--surface:#0f1419;--surface2:#161c24;--border:#1e2a35;
+    --accent:#00d4ff;--accent2:#ff4757;--accent3:#2ed573;
+    --accent4:#ffa502;--accent5:#a29bfe;--text:#e8f4f8;--muted:#5a7a8a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh;padding-bottom:80px;}
+
+  /* アプリヘッダー */
+  .app-header{
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    padding:14px 16px 0;
+    position:sticky;top:0;z-index:100;
+  }
+  .app-title{
+    font-family:'JetBrains Mono',monospace;
+    font-size:1.0rem;font-weight:700;
+    color:var(--accent);letter-spacing:0.05em;
+    margin-bottom:12px;
+  }
+
+  /* アプリレベルのタブ */
+  .app-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);}
+  .app-tab{
+    flex:1;padding:10px 6px;font-size:0.78rem;font-family:'Noto Sans JP',sans-serif;
+    background:transparent;border:none;color:var(--muted);cursor:pointer;
+    border-bottom:2px solid transparent;transition:all 0.2s;
+    text-align:center;
+  }
+  .app-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  /* ページコンテンツ */
+  .app-page{display:none;padding:16px 14px;}
+  .app-page.active{display:block;}
+
+  /* ===== 共通コンポーネント ===== */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;}
+  .card h2{font-size:0.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;}
+  canvas{max-height:240px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .kpi-label{font-size:0.63rem;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:4px;}
+  .kpi-val{font-size:1.0rem;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .kpi-sub{font-size:0.63rem;color:var(--muted);margin-top:2px;}
+  .kpi-month{font-size:0.75rem;font-family:'JetBrains Mono',monospace;margin-top:4px;opacity:0.75;}
+  .insight{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:11px 13px;font-size:0.78rem;line-height:1.65;margin-bottom:8px;}
+  .insight.warn{border-left-color:var(--accent2);}
+  .insight.good{border-left-color:var(--accent3);}
+  .insight.tip{border-left-color:var(--accent4);}
+  .insight strong{color:var(--accent);}
+  .insight.warn strong{color:var(--accent2);}
+  .insight.good strong{color:var(--accent3);}
+  .insight.tip strong{color:var(--accent4);}
+  .badge{display:inline-block;background:var(--border);border-radius:4px;padding:1px 6px;font-size:0.67rem;font-family:'JetBrains Mono',monospace;color:var(--muted);margin-bottom:4px;}
+  .legend-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--muted);}
+  .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+  .tbl{width:100%;border-collapse:collapse;font-size:0.75rem;}
+  .tbl th{color:var(--muted);font-weight:400;padding:6px 4px;border-bottom:1px solid var(--border);text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.67rem;}
+  .tbl th:first-child{text-align:left;}
+  .tbl td{padding:8px 4px;border-bottom:1px solid var(--border);text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.72rem;}
+  .tbl td:first-child{text-align:left;font-family:'Noto Sans JP',sans-serif;}
+  .pos{color:var(--accent3);}.neg{color:var(--accent2);}
+
+  /* ===== トラッカー固有 ===== */
+  .pace-banner{border-radius:12px;padding:14px 16px;margin-bottom:16px;border:1px solid;transition:all 0.3s;}
+  .pace-banner.safe{background:#0a1f0f;border-color:var(--accent3);}
+  .pace-banner.warn{background:#1f1500;border-color:var(--accent4);}
+  .pace-banner.danger{background:#1f0a0a;border-color:var(--accent2);}
+  .pace-label{font-size:0.65rem;font-family:'JetBrains Mono',monospace;color:var(--muted);margin-bottom:4px;}
+  .pace-status{font-size:1.1rem;font-weight:700;margin-bottom:6px;}
+  .pace-banner.safe .pace-status{color:var(--accent3);}
+  .pace-banner.warn .pace-status{color:var(--accent4);}
+  .pace-banner.danger .pace-status{color:var(--accent2);}
+  .pace-progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+  .pace-progress-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+  .pace-detail{font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .target-row{display:flex;gap:6px;margin-bottom:12px;}
+  .target-btn{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 4px;font-size:0.72rem;cursor:pointer;font-family:'JetBrains Mono',monospace;text-align:center;transition:all 0.2s;}
+  .target-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,0.08);}
+  .form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 0 20px rgba(0,212,255,0.1);}
+  .form-card h2{font-size:0.78rem;color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;margin-bottom:14px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+  .form-group{display:flex;flex-direction:column;gap:4px;}
+  .form-group label{font-size:0.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .form-group input,.form-group select,.form-group textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;padding:10px 12px;outline:none;transition:border-color 0.2s;width:100%;}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);}
+  .form-group select option{background:var(--surface2);}
+  .form-group textarea{resize:none;height:60px;}
+  .btn-add{width:100%;background:var(--accent);color:var(--bg);border:none;border-radius:10px;padding:14px;font-size:0.9rem;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;margin-top:8px;transition:opacity 0.2s;}
+  .btn-add:active{opacity:0.8;}
+  .tx-list{display:flex;flex-direction:column;gap:6px;}
+  .tx-item{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border);}
+  .tx-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .tx-info{flex:1;min-width:0;}
+  .tx-name{font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tx-meta{font-size:0.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .tx-amount{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.9rem;color:var(--accent2);flex-shrink:0;}
+  .tx-delete{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:0 4px;flex-shrink:0;}
+  .empty{text-align:center;color:var(--muted);font-size:0.8rem;padding:24px 0;}
+  .danger-btn{width:100%;background:transparent;border:1px solid var(--accent2);color:var(--accent2);border-radius:8px;padding:10px;font-size:0.78rem;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:8px;}
+
+  /* ===== ダッシュボード固有 ===== */
+  .sub-nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .sub-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:0.72rem;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;}
+  .sub-btn.active{background:var(--accent2);border-color:var(--accent2);color:#fff;}
+  .sub-page{display:none;}.sub-page.active{display:block;}
+  .month-cards{display:flex;flex-direction:column;gap:8px;}
+  .month-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .mc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+  .mc-month{font-weight:700;font-size:0.85rem;}
+  .mc-income{font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--accent5);}
+  .mc-bars{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+  .mc-bar-row{display:flex;align-items:center;gap:6px;}
+  .mc-bar-label{width:48px;color:var(--muted);flex-shrink:0;font-size:0.67rem;}
+  .mc-bar-wrap{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .mc-bar-fill{height:100%;border-radius:3px;}
+  .mc-bar-val{width:55px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.67rem;}
+  .mc-footer{display:flex;justify-content:space-between;font-size:0.72rem;padding-top:8px;border-top:1px solid var(--border);}
+  .mc-tag{display:inline-block;background:#2d1f4a;color:var(--accent5);border:1px solid var(--accent5);border-radius:4px;padding:1px 6px;font-size:0.65rem;margin-right:3px;margin-top:4px;}
+  .sim-target{display:flex;gap:8px;margin-bottom:16px;}
+  .sim-btn{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:10px 6px;font-size:0.72rem;cursor:pointer;font-family:'Noto Sans JP',sans-serif;text-align:center;transition:all 0.2s;}
+  .sim-btn.active{border-color:var(--accent3);color:var(--accent3);background:rgba(46,213,115,0.08);}
+  .sim-btn .sa{font-size:1.0rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:block;}
+  .sim-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .sim-row:last-child{border-bottom:none;}
+  .sim-icon{font-size:0.95rem;width:22px;text-align:center;}
+  .sim-name{flex:1;font-size:0.75rem;}
+  .sim-bw{width:60px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .sim-bf{height:100%;border-radius:3px;transition:width 0.4s;}
+  .sim-val{font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;width:62px;text-align:right;}
+  .sim-summary{background:rgba(46,213,115,0.08);border:1px solid var(--accent3);border-radius:12px;padding:16px;margin-top:14px;text-align:center;}
+  .sim-summary .label{font-size:0.72rem;color:var(--muted);margin-bottom:4px;}
+  .sim-summary .val{font-size:1.3rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent3);}
+  .sim-summary .ssub{font-size:0.7rem;color:var(--muted);margin-top:4px;}
+  .cmp-row{display:grid;grid-template-columns:1fr 68px 68px 68px;gap:4px;padding:8px 4px;border-bottom:1px solid var(--border);align-items:center;}
+  .cmp-header{display:grid;grid-template-columns:1fr 68px 68px 68px;gap:4px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:0.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .cmp-total{display:grid;grid-template-columns:1fr 68px 68px 68px;gap:4px;padding:8px 4px;font-weight:700;font-size:0.75rem;border-top:2px solid var(--border);margin-top:2px;}
+  .pace-tbl-row{display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:4px;padding:10px 4px;border-bottom:1px solid var(--border);align-items:center;}
+  .pace-tbl-header{display:grid;grid-template-columns:60px 1fr 1fr 1fr;gap:4px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:0.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+
+<!-- アプリヘッダー -->
+<div class="app-header">
+  <div class="app-title">// MONEY APP</div>
+  <div class="app-tabs">
+    <button class="app-tab active" onclick="switchApp('tracker',this)">📊 今月トラッカー</button>
+    <button class="app-tab" onclick="switchApp('dashboard',this)">📈 過去分析</button>
+    <button class="app-tab" onclick="switchApp('pace',this)">🎯 ペース確認</button>
+  </div>
+</div>
+
+<!-- ===== トラッカーページ ===== -->
+<div class="app-page active" id="app-tracker">
+
+  <!-- ペース判定バナー -->
+  <div class="pace-banner safe" id="paceBanner">
+    <div class="pace-label">TODAY'S PACE CHECK</div>
+    <div class="pace-status" id="paceStatus">データを入力してください</div>
+    <div class="pace-progress"><div class="pace-progress-fill" id="paceBar" style="width:0%"></div></div>
+    <div class="pace-detail" id="paceDetail">-</div>
+  </div>
+
+  <!-- 目標切替 -->
+  <div class="target-row">
+    <button class="target-btn" onclick="setTarget(100000,this)">¥10万</button>
+    <button class="target-btn active" onclick="setTarget(120000,this)">¥12万</button>
+    <button class="target-btn" onclick="setTarget(150000,this)">¥15万</button>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">今月の累計</div>
+      <div class="kpi-val" id="kpiTotal" style="color:var(--accent)">¥0</div>
+      <div class="kpi-sub" id="kpiCount">0件</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">目標まで残り</div>
+      <div class="kpi-val" id="kpiRemain" style="color:var(--accent3)">-</div>
+      <div class="kpi-sub" id="kpiRemainSub">-</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">今日の支出</div>
+      <div class="kpi-val" id="kpiToday" style="color:var(--accent4)">¥0</div>
+      <div class="kpi-sub">本日分</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">このペースで月末</div>
+      <div class="kpi-val" id="kpiProjected" style="color:var(--accent5)">-</div>
+      <div class="kpi-sub" id="kpiAvgSub">日平均 ¥0</div>
+    </div>
+  </div>
+
+  <!-- 入力フォーム -->
+  <div class="form-card">
+    <h2>// ADD EXPENSE</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>日付</label>
+        <input type="date" id="inputDate">
+      </div>
+      <div class="form-group">
+        <label>金額（円・大体でOK）</label>
+        <input type="number" id="inputAmount" placeholder="例: 980" min="0">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label>カテゴリ</label>
+      <select id="inputCategory">
+        <option value="外食">🍜 外食</option>
+        <option value="コンビニ">🏪 コンビニ</option>
+        <option value="交通">🚃 交通・Suica</option>
+        <option value="飲み会">🍺 飲み会・娯楽</option>
+        <option value="ショッピング">🛍️ ショッピング</option>
+        <option value="タバコ">🚬 タバコ</option>
+        <option value="美容">💇 美容</option>
+        <option value="通販等">📦 通販</option>
+        <option value="その他">📌 その他</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label>メモ（店名など）</label>
+      <textarea id="inputMemo" placeholder="例: 日高屋 西日暮里"></textarea>
+    </div>
+    <button class="btn-add" onclick="addExpense()">＋ 追加する</button>
+  </div>
+
+  <!-- グラフ -->
+  <div class="card">
+    <h2>今月の累計推移</h2>
+    <canvas id="trendChart"></canvas>
+  </div>
+  <div class="card">
+    <h2>カテゴリ別合計（今月）</h2>
+    <canvas id="catChartTracker"></canvas>
+  </div>
+
+  <!-- 履歴 -->
+  <div class="card">
+    <h2>今月の履歴</h2>
+    <div class="tx-list" id="txList"><div class="empty">まだデータがありません</div></div>
+    <button class="danger-btn" onclick="clearMonth()">今月のデータをリセット</button>
+  </div>
+</div>
+
+<!-- ===== ダッシュボードページ ===== -->
+<div class="app-page" id="app-dashboard">
+  <div class="sub-nav">
+    <button class="sub-btn active" onclick="showSub('overview',this)">概要</button>
+    <button class="sub-btn" onclick="showSub('category',this)">カテゴリ</button>
+    <button class="sub-btn" onclick="showSub('monthly',this)">月別</button>
+    <button class="sub-btn" onclick="showSub('simulation',this)">節約シミュ</button>
+  </div>
+
+  <!-- 概要 -->
+  <div class="sub-page active" id="sub-overview">
+    <div class="kpi-grid">
+      <div class="kpi" style="border-color:var(--accent5)">
+        <div class="kpi-label">収入</div>
+        <div class="kpi-val" style="color:var(--accent5)">¥4,648,745</div>
+        <div class="kpi-sub">年間（給料＋賞与）</div>
+        <div class="kpi-month" style="color:var(--accent5)">月平均 ¥387,395</div>
+      </div>
+      <div class="kpi" style="border-color:var(--accent2)">
+        <div class="kpi-label">支出合計</div>
+        <div class="kpi-val" style="color:var(--accent2)">¥3,684,247</div>
+        <div class="kpi-sub">年間（全費目統合）</div>
+        <div class="kpi-month" style="color:var(--accent2)">月平均 ¥307,021</div>
+      </div>
+      <div class="kpi" style="border-color:var(--accent)">
+        <div class="kpi-label">固定費</div>
+        <div class="kpi-val" style="color:var(--accent)">¥2,070,076</div>
+        <div class="kpi-sub">年間（家賃・奨学金・Mac等）</div>
+        <div class="kpi-month" style="color:var(--accent)">月平均 ¥172,506</div>
+      </div>
+      <div class="kpi" style="border-color:var(--accent3)">
+        <div class="kpi-label">年間収支（推定）</div>
+        <div class="kpi-val" style="color:var(--accent3)">¥964,493</div>
+        <div class="kpi-sub">年間貯金可能額</div>
+        <div class="kpi-month" style="color:var(--accent3)">月平均 ¥80,374</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>月別 収入・固定費・変動支出・収支</h2>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#a29bfe"></div>収入</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>固定費</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff4757"></div>変動支出</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2ed573;border-radius:50%"></div>収支</div>
+      </div>
+      <canvas id="overviewChart"></canvas>
+    </div>
+    <div class="insight good"><div class="badge">実態</div><br>楽天キャッシュをメインカードに統合すると年間収支は<strong>約¥96万</strong>のプラス。月平均<strong>¥80,374の貯金余地</strong>があります。</div>
+    <div class="insight warn"><div class="badge">楽天キャッシュ（解消済み）</div><br>4〜9月に<strong>¥244,000</strong>が楽天キャッシュ経由で消えていました。10月以降にやめたのは大正解。</div>
+    <div class="insight tip"><div class="badge">次の一手</div><br>プレミアムウォーター（年間約¥35,000）の見直しと、飲み会の上限設定が残った削減余地です。</div>
+  </div>
+
+  <!-- カテゴリ -->
+  <div class="sub-page" id="sub-category">
+    <div class="card"><h2>カテゴリ別月次推移</h2><canvas id="catStackChart"></canvas></div>
+    <div class="card"><h2>主要カテゴリ折れ線</h2><canvas id="catLineChart"></canvas></div>
+    <div class="card"><h2>カテゴリ別年間合計</h2><canvas id="catBarChart"></canvas></div>
+    <div class="card"><h2>カテゴリ別 月平均・年間合計</h2><table class="tbl" id="catTable"></table></div>
+    <div class="card"><h2>支出構成（年間平均）</h2><canvas id="catDoughnut"></canvas></div>
+    <div class="card"><h2>月平均 内訳カード</h2><div id="catGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;"></div></div>
+  </div>
+
+  <!-- 月別 -->
+  <div class="sub-page" id="sub-monthly">
+    <div class="month-cards" id="monthCards"></div>
+  </div>
+
+  <!-- 節約シミュ -->
+  <div class="sub-page" id="sub-simulation">
+    <p style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">変動支出を削ると月いくら残るか</p>
+    <p style="font-size:0.72rem;color:var(--accent2);margin-bottom:12px">月収平均¥346,115（賞与除く）/ 固定費¥172,506 ベース</p>
+    <div class="sim-target">
+      <button class="sim-btn" onclick="setSim(80000,this)"><span class="sa">¥8万</span>きつめ</button>
+      <button class="sim-btn active" onclick="setSim(120000,this)"><span class="sa">¥12万</span>現実的</button>
+      <button class="sim-btn" onclick="setSim(150000,this)"><span class="sa">¥15万</span>現状維持</button>
+    </div>
+    <div class="card"><h2>今の平均 vs 目標額 vs 差額</h2><div id="simCompare"></div></div>
+    <div class="card"><h2>カテゴリ別予算配分</h2><div id="simRows"></div></div>
+    <div class="sim-summary" id="simSummary"></div>
+    <div style="margin-top:14px">
+      <div class="insight good"><div class="badge">月12万円プランの場合</div><br>月収¥346,115 - 固定費¥172,506 - 変動¥120,000 = <strong>月¥53,609の貯金</strong>。年間（賞与含む）<strong>約¥97万円</strong>貯金できます。</div>
+      <div class="insight tip"><div class="badge">賞与を温存すれば</div><br>7月¥105K＋1月¥338Kの賞与を使わなければ、それだけで年間<strong>¥443,000</strong>が積み上がります。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ペース確認ページ ===== -->
+<div class="app-page" id="app-pace">
+  <p style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">過去12ヶ月の実績データ（約800件）から算出</p>
+  <p style="font-size:0.72rem;color:var(--accent2);margin-bottom:16px">Oliveアプリの表示金額と比べてペースを確認</p>
+  <div class="sim-target">
+    <button class="sim-btn" onclick="setPaceTarget(100000,this)"><span class="sa">¥10万</span>目標</button>
+    <button class="sim-btn active" onclick="setPaceTarget(120000,this)"><span class="sa">¥12万</span>目標</button>
+    <button class="sim-btn" onclick="setPaceTarget(150000,this)"><span class="sa">¥15万</span>目標</button>
+  </div>
+  <div class="card"><h2>月中ペース確認チャート（実績ベース）</h2><canvas id="paceChart"></canvas></div>
+  <div class="card">
+    <h2>時点別 安全ライン一覧</h2>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px">🟢 この金額以下なら目標達成ペース / 🔴 超えたら要ブレーキ</p>
+    <div class="pace-tbl-header"><span>時点</span><span style="text-align:right">🟢 安全ライン</span><span style="text-align:right">📊 平均ペース</span><span style="text-align:right">判定</span></div>
+    <div id="paceTableRows"></div>
+  </div>
+  <div class="insight good"><div class="badge">使い方</div><br>月の途中でOliveアプリを確認して上の表と比較するだけ。<strong>安全ライン以下なら◎、超えてたら残りで調整</strong>。ラグ考慮で表示より¥3,000〜5,000多く見積もると安全。</div>
+  <div class="insight tip"><div class="badge">算出根拠</div><br>過去12ヶ月・約800件の取引を利用日ベースで集計。各時点の平均消化率を算出し<strong>15%厳しめ</strong>に設定。</div>
+</div>
+
+<script>
+// ===== アプリ切替 =====
+function switchApp(id, btn) {
+  document.querySelectorAll('.app-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.app-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('app-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function showSub(id, btn) {
+  document.querySelectorAll('.sub-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sub-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sub-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ===== カテゴリカラー =====
+const catColors = {
+  '外食':'#ff9f6c','コンビニ':'#ff6c8a','交通':'#00d4ff','飲み会':'#ff4757',
+  '美容':'#a29bfe','ショッピング':'#2ed573','タバコ':'#ffa502','通販等':'#74b9ff','その他':'#636e72'
+};
+const catIco = {'外食':'🍜','コンビニ':'🏪','交通':'🚃','飲み会':'🍺','美容':'💇','ショッピング':'🛍️','タバコ':'🚬','通販等':'📦','その他':'📌'};
+
+// ===== ペースデータ（実績ベース） =====
+const paceCheckpoints = [5,7,10,15,20,25,28];
+const avgRatios = [0.265,0.326,0.431,0.607,0.751,0.872,0.955];
+const strictRatios = avgRatios.map(r=>r*0.85);
+
+function getSafeLimit(tgt, day) {
+  const safe = tgt===100000?[22553,27678,36617,51578,63802,74137,81202]:
+               tgt===150000?[33830,41517,54925,77354,95692,111205,121753]:
+               [27064,33214,43940,61883,76553,88964,97402];
+  for(let i=0;i<paceCheckpoints.length;i++){
+    if(day<=paceCheckpoints[i]){
+      if(i===0) return Math.round(safe[0]*(day/paceCheckpoints[0]));
+      const d0=paceCheckpoints[i-1],d1=paceCheckpoints[i],s0=safe[i-1],s1=safe[i];
+      return Math.round(s0+(s1-s0)*(day-d0)/(d1-d0));
+    }
+  }
+  return tgt;
+}
+
+// ===== トラッカー =====
+const STORAGE_KEY='daily_tracker_v1';
+const TARGET_KEY='daily_tracker_target';
+let trackerTarget = parseInt(localStorage.getItem(TARGET_KEY)||'120000');
+let expenses = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+const today = new Date();
+const todayStr = today.toISOString().split('T')[0];
+
+document.getElementById('inputDate').value = todayStr;
+document.querySelectorAll('.target-btn').forEach(b=>{
+  if(parseInt(b.textContent.replace(/[^\d]/g,''))*10000===trackerTarget||
+     b.textContent.includes('12')&&trackerTarget===120000||
+     b.textContent.includes('10')&&trackerTarget===100000||
+     b.textContent.includes('15')&&trackerTarget===150000) b.classList.add('active');
+  else b.classList.remove('active');
+});
+
+function getMonthKey(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;}
+function getMonthExpenses(){return expenses.filter(e=>e.date.startsWith(getMonthKey()));}
+
+function setTarget(t,btn){
+  trackerTarget=t;
+  localStorage.setItem(TARGET_KEY,t);
+  document.querySelectorAll('.target-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTracker();
+}
+
+function addExpense(){
+  const date=document.getElementById('inputDate').value;
+  const amount=parseInt(document.getElementById('inputAmount').value);
+  const category=document.getElementById('inputCategory').value;
+  const memo=document.getElementById('inputMemo').value.trim();
+  if(!date||!amount||amount<=0){alert('日付と金額を入力してください');return;}
+  expenses.push({id:Date.now(),date,amount,category,memo});
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(expenses));
+  document.getElementById('inputAmount').value='';
+  document.getElementById('inputMemo').value='';
+  renderTracker();
+}
+
+function deleteExpense(id){
+  expenses=expenses.filter(e=>e.id!==id);
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(expenses));
+  renderTracker();
+}
+
+function clearMonth(){
+  if(!confirm('今月のデータを全て削除しますか？'))return;
+  expenses=expenses.filter(e=>!e.date.startsWith(getMonthKey()));
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(expenses));
+  renderTracker();
+}
+
+let trendChart=null,catChartTracker=null;
+
+function renderTracker(){
+  const monthExp=getMonthExpenses();
+  const totalAmt=monthExp.reduce((a,e)=>a+e.amount,0);
+  const todayAmt=monthExp.filter(e=>e.date===todayStr).reduce((a,e)=>a+e.amount,0);
+  const currentDay=today.getDate();
+  const daysInMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  const remainDays=daysInMonth-currentDay;
+  const avgPerDay=currentDay>0?Math.round(totalAmt/currentDay):0;
+  const projected=avgPerDay*daysInMonth;
+  const remain=trackerTarget-totalAmt;
+
+  document.getElementById('kpiTotal').textContent=`¥${totalAmt.toLocaleString()}`;
+  document.getElementById('kpiCount').textContent=`${monthExp.length}件`;
+  document.getElementById('kpiRemain').textContent=`¥${Math.max(0,remain).toLocaleString()}`;
+  document.getElementById('kpiRemain').style.color=remain<0?'var(--accent2)':'var(--accent3)';
+  document.getElementById('kpiRemainSub').textContent=remainDays>0?`残${remainDays}日で¥${Math.round(Math.max(0,remain)/remainDays).toLocaleString()}/日`:'月末';
+  document.getElementById('kpiToday').textContent=`¥${todayAmt.toLocaleString()}`;
+  document.getElementById('kpiProjected').textContent=`¥${projected.toLocaleString()}`;
+  document.getElementById('kpiAvgSub').textContent=`日平均 ¥${avgPerDay.toLocaleString()}`;
+
+  // ペース判定
+  const safeLimit=getSafeLimit(trackerTarget,currentDay);
+  const ratio=safeLimit>0?totalAmt/safeLimit:0;
+  const pctOfTarget=trackerTarget>0?Math.min(totalAmt/trackerTarget*100,100):0;
+  const banner=document.getElementById('paceBanner');
+  const barEl=document.getElementById('paceBar');
+
+  if(totalAmt===0){
+    banner.className='pace-banner safe';
+    document.getElementById('paceStatus').textContent='データを入力してください';
+    barEl.style.width='0%';barEl.style.background='var(--accent3)';
+    document.getElementById('paceDetail').textContent='-';
+  } else if(ratio<=0.85){
+    banner.className='pace-banner safe';
+    document.getElementById('paceStatus').textContent=`🟢 安全ペース — ¥${(safeLimit-totalAmt).toLocaleString()} の余裕あり`;
+    barEl.style.width=`${pctOfTarget}%`;barEl.style.background='var(--accent3)';
+    document.getElementById('paceDetail').textContent=`${currentDay}日時点の安全ライン: ¥${safeLimit.toLocaleString()} / 現在: ¥${totalAmt.toLocaleString()}`;
+  } else if(ratio<=1.0){
+    banner.className='pace-banner warn';
+    document.getElementById('paceStatus').textContent=`🟡 やや超過ペース — 残りで調整を`;
+    barEl.style.width=`${pctOfTarget}%`;barEl.style.background='var(--accent4)';
+    document.getElementById('paceDetail').textContent=`${currentDay}日時点の安全ライン: ¥${safeLimit.toLocaleString()} / 現在: ¥${totalAmt.toLocaleString()}`;
+  } else {
+    banner.className='pace-banner danger';
+    document.getElementById('paceStatus').textContent=`🔴 オーバーペース — 要ブレーキ！`;
+    barEl.style.width=`${pctOfTarget}%`;barEl.style.background='var(--accent2)';
+    document.getElementById('paceDetail').textContent=`安全ラインを¥${(totalAmt-safeLimit).toLocaleString()}超過中`;
+  }
+
+  // 累計推移
+  const byDay={};
+  monthExp.forEach(e=>{const d=parseInt(e.date.split('-')[2]);byDay[d]=(byDay[d]||0)+e.amount;});
+  const trendLabels=[],trendData=[],safeData=[],targetData=[];
+  let cum=0;
+  for(let d=1;d<=currentDay;d++){
+    cum+=byDay[d]||0;
+    trendLabels.push(`${d}日`);
+    trendData.push(cum);
+    safeData.push(getSafeLimit(trackerTarget,d));
+    targetData.push(trackerTarget);
+  }
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:trendLabels,datasets:[
+      {label:'実績',data:trendData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.1)',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+      {label:'安全ライン',data:safeData,borderColor:'#2ed573',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:0,borderWidth:1.5,borderDash:[4,3]},
+      {label:`目標¥${(trackerTarget/10000).toFixed(0)}万`,data:targetData,borderColor:'#ff4757',backgroundColor:'transparent',fill:false,pointRadius:0,borderWidth:1,borderDash:[2,4]},
+    ]},
+    options:{
+      plugins:{legend:{labels:{color:'#e8f4f8',font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ¥${ctx.raw?.toLocaleString()}`}}},
+      scales:{
+        x:{ticks:{color:'#5a7a8a',font:{size:9},maxTicksLimit:10},grid:{color:'#1e2a35'}},
+        y:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(0)}万`,font:{size:9}},grid:{color:'#1e2a35'},max:Math.round(trackerTarget*1.15)}
+      }
+    }
+  });
+
+  // カテゴリ別
+  const byCat={};
+  monthExp.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount;});
+  const catEntries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  if(catChartTracker)catChartTracker.destroy();
+  if(catEntries.length>0){
+    catChartTracker=new Chart(document.getElementById('catChartTracker'),{
+      type:'bar',
+      data:{labels:catEntries.map(([k])=>`${catIco[k]||''} ${k}`),datasets:[{
+        data:catEntries.map(([,v])=>v),
+        backgroundColor:catEntries.map(([k])=>(catColors[k]||'#636e72')+'99'),
+        borderColor:catEntries.map(([k])=>catColors[k]||'#636e72'),
+        borderWidth:1,borderRadius:6,borderSkipped:false,
+      }]},
+      options:{
+        indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`¥${ctx.raw.toLocaleString()}`}}},
+        scales:{
+          x:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/1000).toFixed(0)}k`,font:{size:9}},grid:{color:'#1e2a35'}},
+          y:{ticks:{color:'#e8f4f8',font:{size:10}},grid:{color:'#1e2a35'}}
+        }
+      }
+    });
+  }
+
+  // 履歴リスト
+  const listEl=document.getElementById('txList');
+  const sorted=[...monthExp].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  if(sorted.length===0){listEl.innerHTML='<div class="empty">まだデータがありません</div>';}
+  else{
+    listEl.innerHTML='';
+    sorted.forEach(e=>{
+      const item=document.createElement('div');
+      item.className='tx-item';
+      const d=e.date.split('-');
+      item.innerHTML=`
+        <div class="tx-cat-dot" style="background:${catColors[e.category]||'#636e72'}"></div>
+        <div class="tx-info">
+          <div class="tx-name">${catIco[e.category]||''} ${e.memo||e.category}</div>
+          <div class="tx-meta">${d[1]}/${d[2]} · ${e.category}</div>
+        </div>
+        <div class="tx-amount">▲¥${e.amount.toLocaleString()}</div>
+        <button class="tx-delete" onclick="deleteExpense(${e.id})">✕</button>
+      `;
+      listEl.appendChild(item);
+    });
+  }
+}
+
+// ===== ダッシュボードデータ =====
+const months=['4月','5月','6月','7月','8月','9月','10月','11月','12月','1月','2月','3月'];
+const income=[396706,294885,397335,450910,350598,346115,349843,347854,394832,681996,302622,335044];
+const fixedArr=[165872,170946,166972,166972,171606,169846,172872,176846,172872,177528,172872,184872];
+const varArr=[77697,132316,130223,169263,167818,178123,129050,137661,153633,92575,130715,115097];
+const totalArr=fixedArr.map((f,i)=>f+varArr[i]);
+const balArr=income.map((inc,i)=>inc-totalArr[i]);
+const catData={
+  '外食':       [13530,12560,11311,15772,10910,22166,22851,21570,18370,14418,19018,16496],
+  'コンビニ':   [8182,10000,14298,8550,8556,17686,13065,10518,12686,15677,25432,25695],
+  '交通':       [15700,33970,32000,37700,54800,37500,31900,32400,58330,26800,23850,21050],
+  '飲み会':     [13210,13172,10980,34672,26338,41896,16748,43921,9435,0,8549,2490],
+  '美容':       [0,6710,0,8250,0,0,13750,0,8250,0,12650,0],
+  'ショッピング':[3098,0,13961,23350,0,14937,6226,4020,15720,6226,13113,15398],
+  'タバコ':     [18000,18000,18000,20000,20000,20000,20000,20000,20000,20000,20000,20000],
+  '通販等':     [7634,7376,7328,7330,16058,7515,7526,7838,7935,7971,7877,10601],
+  'その他':     [0,30528,22345,13639,30156,16423,3984,4394,9907,8483,7276,10367],
+};
+const catPal={
+  '外食':'#ff9f6c','コンビニ':'#ff6c8a','交通':'#00d4ff','飲み会':'#ff4757',
+  '美容':'#a29bfe','ショッピング':'#2ed573','タバコ':'#ffa502','通販等':'#74b9ff','その他':'#636e72'
+};
+const monthNotes=[
+  {emoji:'🌱',label:'転職直後',tags:['転職直後・支出少なめ']},
+  {emoji:'✈️',label:'GW帰省',tags:['GW帰省 ¥28,790']},
+  {emoji:'☔',label:'通常月',tags:[]},
+  {emoji:'🎉',label:'夏賞与＋デカい遊び',tags:['夏賞与¥104,795','LUCIS GARDEN ¥18,000']},
+  {emoji:'🏠',label:'お盆帰省',tags:['お盆帰省 ¥36,580']},
+  {emoji:'📱',label:'機種変更',tags:['au機種変更 ¥11,500']},
+  {emoji:'🌏',label:'海外旅行＋美容院',tags:['フィリピン旅行','美容院 ¥13,750']},
+  {emoji:'🍺',label:'飲み会ピーク',tags:['飲み会3回 計¥44,000']},
+  {emoji:'🎍',label:'年末帰省',tags:['年末帰省 ¥30,730','美容院 ¥8,250']},
+  {emoji:'🎁',label:'冬賞与',tags:['冬賞与¥337,764','定期初購入¥15,250']},
+  {emoji:'💇',label:'美容院',tags:['美容院 ¥12,650']},
+  {emoji:'📊',label:'GTOWIZARD解約',tags:['GTOWIZARD解約済み','JR定期値上げ']},
+];
+
+// 概要チャート
+new Chart(document.getElementById('overviewChart'),{
+  type:'bar',
+  data:{labels:months,datasets:[
+    {label:'収入',data:income,backgroundColor:'#a29bfe44',borderColor:'#a29bfe',borderWidth:1,borderRadius:3,borderSkipped:false},
+    {label:'固定費',data:fixedArr,backgroundColor:'#00d4ff44',borderColor:'#00d4ff',borderWidth:1,borderRadius:3,borderSkipped:false,stack:'s'},
+    {label:'変動支出',data:varArr,backgroundColor:'#ff475766',borderColor:'#ff4757',borderWidth:1,borderRadius:3,borderSkipped:false,stack:'s'},
+    {label:'収支',data:balArr,type:'line',borderColor:'#2ed573',backgroundColor:'transparent',pointBackgroundColor:balArr.map(v=>v>=0?'#2ed573':'#ff4757'),pointRadius:5,tension:0.3,borderWidth:2},
+  ]},
+  options:{
+    plugins:{legend:{labels:{color:'#e8f4f8',font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}`}}},
+    scales:{
+      x:{ticks:{color:'#5a7a8a',font:{size:9}},grid:{color:'#1e2a35'}},
+      y:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(0)}万`,font:{size:10}},grid:{color:'#1e2a35'}}
+    }
+  }
+});
+
+// カテゴリ積み上げ
+new Chart(document.getElementById('catStackChart'),{
+  type:'bar',
+  data:{labels:months,datasets:Object.entries(catData).map(([key,vals])=>({
+    label:key,data:vals,backgroundColor:catPal[key]+'99',borderColor:catPal[key],borderWidth:1,borderRadius:3,borderSkipped:false,stack:'s'
+  }))},
+  options:{
+    plugins:{legend:{labels:{color:'#e8f4f8',font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}`}}},
+    scales:{x:{stacked:true,ticks:{color:'#5a7a8a',font:{size:9}},grid:{color:'#1e2a35'}},y:{stacked:true,ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(0)}万`,font:{size:10}},grid:{color:'#1e2a35'}}}
+  }
+});
+
+// 折れ線
+new Chart(document.getElementById('catLineChart'),{
+  type:'line',
+  data:{labels:months,datasets:[
+    {label:'交通',data:catData['交通'],borderColor:'#00d4ff',backgroundColor:'transparent',pointRadius:4,tension:0.3,borderWidth:2},
+    {label:'飲み会',data:catData['飲み会'],borderColor:'#ff4757',backgroundColor:'transparent',pointRadius:4,tension:0.3,borderWidth:2},
+    {label:'コンビニ',data:catData['コンビニ'],borderColor:'#ff6c8a',backgroundColor:'transparent',pointRadius:4,tension:0.3,borderWidth:2},
+    {label:'外食',data:catData['外食'],borderColor:'#ff9f6c',backgroundColor:'transparent',pointRadius:4,tension:0.3,borderWidth:2},
+    {label:'タバコ',data:catData['タバコ'],borderColor:'#ffa502',backgroundColor:'transparent',pointRadius:4,tension:0.3,borderWidth:2,borderDash:[5,3]},
+  ]},
+  options:{
+    plugins:{legend:{labels:{color:'#e8f4f8',font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ¥${ctx.raw.toLocaleString()}`}}},
+    scales:{x:{ticks:{color:'#5a7a8a',font:{size:9}},grid:{color:'#1e2a35'}},y:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(1)}万`,font:{size:10}},grid:{color:'#1e2a35'}}}
+  }
+});
+
+// 年間横棒
+const catAnnual=Object.entries(catData).map(([k,v])=>({label:k,total:v.reduce((a,b)=>a+b,0),avg:Math.round(v.reduce((a,b)=>a+b,0)/12)})).sort((a,b)=>b.total-a.total);
+new Chart(document.getElementById('catBarChart'),{
+  type:'bar',
+  data:{labels:catAnnual.map(d=>d.label),datasets:[{data:catAnnual.map(d=>d.total),backgroundColor:catAnnual.map(d=>catPal[d.label]+'99'),borderColor:catAnnual.map(d=>catPal[d.label]),borderWidth:1,borderRadius:4,borderSkipped:false}]},
+  options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`¥${ctx.raw.toLocaleString()}`}}},scales:{x:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(0)}万`,font:{size:9}},grid:{color:'#1e2a35'}},y:{ticks:{color:'#e8f4f8',font:{size:10}},grid:{color:'#1e2a35'}}}}
+});
+
+// テーブル
+const catTableEl=document.getElementById('catTable');
+catTableEl.innerHTML='<tr><th style="text-align:left">カテゴリ</th><th>月平均</th><th>年間合計</th></tr>';
+catAnnual.forEach(d=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${catIco[d.label]||''} ${d.label}</td><td style="color:${catPal[d.label]}">¥${d.avg.toLocaleString()}</td><td style="color:${catPal[d.label]}">¥${d.total.toLocaleString()}</td>`;
+  catTableEl.appendChild(tr);
+});
+
+// ドーナツ
+new Chart(document.getElementById('catDoughnut'),{
+  type:'doughnut',
+  data:{labels:catAnnual.map(d=>d.label),datasets:[{data:catAnnual.map(d=>d.avg),backgroundColor:catAnnual.map(d=>catPal[d.label]),borderColor:'#0f1419',borderWidth:3}]},
+  options:{plugins:{legend:{labels:{color:'#e8f4f8',font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ¥${ctx.raw.toLocaleString()}/月平均`}}}}
+});
+
+// グリッドカード
+const gridEl=document.getElementById('catGrid');
+catAnnual.forEach(d=>{
+  const div=document.createElement('div');
+  div.style.cssText=`background:var(--surface);border:1px solid ${catPal[d.label]};border-radius:10px;padding:12px;`;
+  div.innerHTML=`<div style="font-size:0.67rem;color:var(--muted);margin-bottom:4px">${catIco[d.label]||''} ${d.label}</div><div style="font-size:1.0rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:${catPal[d.label]}">¥${d.avg.toLocaleString()}</div><div style="font-size:0.65rem;color:var(--muted);margin-top:2px">月平均</div>`;
+  gridEl.appendChild(div);
+});
+
+// 月別カード
+const cardContainer=document.getElementById('monthCards');
+months.forEach((m,i)=>{
+  const note=monthNotes[i];
+  const bal=balArr[i];
+  const card=document.createElement('div');
+  card.className='month-card';
+  card.innerHTML=`
+    <div class="mc-header"><div class="mc-month">${note.emoji} ${m}（${note.label}）</div><div class="mc-income">¥${income[i].toLocaleString()}</div></div>
+    <div class="mc-bars">
+      <div class="mc-bar-row"><span class="mc-bar-label" style="color:var(--accent5)">収入</span><div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:100%;background:var(--accent5)"></div></div><span class="mc-bar-val" style="color:var(--accent5)">¥${(income[i]/10000).toFixed(0)}万</span></div>
+      <div class="mc-bar-row"><span class="mc-bar-label" style="color:var(--accent)">固定費</span><div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(fixedArr[i]/income[i]*100)}%;background:var(--accent)"></div></div><span class="mc-bar-val" style="color:var(--accent)">¥${(fixedArr[i]/10000).toFixed(1)}万</span></div>
+      <div class="mc-bar-row"><span class="mc-bar-label" style="color:var(--accent2)">変動費</span><div class="mc-bar-wrap"><div class="mc-bar-fill" style="width:${Math.round(varArr[i]/income[i]*100)}%;background:var(--accent2)"></div></div><span class="mc-bar-val" style="color:var(--accent2)">¥${(varArr[i]/10000).toFixed(1)}万</span></div>
+    </div>
+    <div class="mc-footer"><span style="color:var(--muted)">支出合計 ¥${totalArr[i].toLocaleString()}</span><span style="color:${bal>=0?'var(--accent3)':'var(--accent2)'}">収支 ${bal>=0?'+':''}¥${bal.toLocaleString()}</span></div>
+    ${note.tags.length>0?`<div style="margin-top:6px">${note.tags.map(t=>`<span class="mc-tag">📌 ${t}</span>`).join('')}</div>`:''}
+  `;
+  cardContainer.appendChild(card);
+});
+
+// 節約シミュ
+const simPalette={'交通':'#00d4ff','タバコ':'#ffa502','飲み会':'#ff4757','外食':'#ff9f6c','コンビニ':'#ff6c8a','ショッピング':'#2ed573','その他':'#636e72','美容':'#a29bfe','通販等':'#74b9ff'};
+const simIcons={'交通':'🚃','タバコ':'🚬','飲み会':'🍺','外食':'🍜','コンビニ':'🏪','ショッピング':'🛍️','その他':'📌','美容':'💇','通販等':'📦'};
+const simCats=[
+  {label:'交通',ratio:0.21},{label:'タバコ',ratio:0.17},{label:'飲み会',ratio:0.14},
+  {label:'外食',ratio:0.13},{label:'コンビニ',ratio:0.12},{label:'ショッピング',ratio:0.09},
+  {label:'その他',ratio:0.08},{label:'美容',ratio:0.04},{label:'通販等',ratio:0.02},
+];
+const avgIncome=346115,avgFixed=172506;
+
+function setSim(t,btn){
+  document.querySelectorAll('#sub-simulation .sim-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderSim(t);
+}
+function renderSim(target){
+  const cmp=document.getElementById('simCompare');cmp.innerHTML='';
+  const hdr=document.createElement('div');hdr.className='cmp-header';
+  hdr.innerHTML='<span>カテゴリ</span><span style="text-align:right">現在平均</span><span style="text-align:right">目標額</span><span style="text-align:right">差額</span>';
+  cmp.appendChild(hdr);
+  const maxR=Math.max(...simCats.map(c=>c.ratio));
+  simCats.forEach(cat=>{
+    const tv=Math.round(target*cat.ratio);
+    const cur=catAnnual.find(d=>d.label===cat.label)?.avg||0;
+    const diff=tv-cur;
+    const row=document.createElement('div');row.className='cmp-row';
+    row.innerHTML=`<span style="font-size:0.75rem">${simIcons[cat.label]||'📌'} ${cat.label}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--muted)">¥${cur.toLocaleString()}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:${simPalette[cat.label]}">¥${tv.toLocaleString()}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:700;color:${diff>=0?'var(--accent3)':'var(--accent2)'}>${diff>=0?'+':'▲'}¥${Math.abs(diff).toLocaleString()}</span>`;
+    cmp.appendChild(row);
+  });
+  const totCur=simCats.reduce((a,c)=>a+(catAnnual.find(d=>d.label===c.label)?.avg||0),0);
+  const totDiff=target-totCur;
+  const totRow=document.createElement('div');totRow.className='cmp-total';
+  totRow.innerHTML=`<span>合計</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color:var(--muted)">¥${totCur.toLocaleString()}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color:var(--accent3)">¥${target.toLocaleString()}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;color:${totDiff>=0?'var(--accent3)':'var(--accent2)'}>${totDiff>=0?'+':'▲'}¥${Math.abs(totDiff).toLocaleString()}</span>`;
+  cmp.appendChild(totRow);
+
+  const rows=document.getElementById('simRows');rows.innerHTML='';
+  simCats.forEach(cat=>{
+    const val=Math.round(target*cat.ratio);
+    const row=document.createElement('div');row.className='sim-row';
+    row.innerHTML=`<span class="sim-icon">${simIcons[cat.label]||'📌'}</span><span class="sim-name">${cat.label}</span><div class="sim-bw"><div class="sim-bf" style="width:${Math.round(cat.ratio/maxR*100)}%;background:${simPalette[cat.label]}"></div></div><span class="sim-val" style="color:${simPalette[cat.label]}">¥${val.toLocaleString()}</span>`;
+    rows.appendChild(row);
+  });
+  const rem=avgIncome-avgFixed-target;
+  const curRem=avgIncome-avgFixed-138014;
+  const d2=rem-curRem;
+  document.getElementById('simSummary').innerHTML=`<div class="label">月収¥${avgIncome.toLocaleString()} - 固定費¥${avgFixed.toLocaleString()} - 変動¥${target.toLocaleString()}</div><div class="val">月¥${rem.toLocaleString()} 手元に残る</div><div class="ssub">現状より月${d2>=0?'+':''}¥${d2.toLocaleString()}の${d2>=0?'改善':'悪化'} / 賞与は別途</div>`;
+}
+renderSim(120000);
+
+// ===== ペース確認 =====
+let paceChartInst=null;
+function setPaceTarget(t,btn){
+  document.querySelectorAll('#app-pace .sim-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderPacePage(t);
+}
+function renderPacePage(target){
+  if(paceChartInst)paceChartInst.destroy();
+  const cps=[0,...paceCheckpoints,31];
+  const safeLine=[0,...paceCheckpoints.map((_,i)=>Math.round(target*strictRatios[i])),Math.round(target*0.95)];
+  const avgLine=[0,...paceCheckpoints.map((_,i)=>Math.round(target*avgRatios[i])),target];
+  const limLine=cps.map(()=>target);
+  paceChartInst=new Chart(document.getElementById('paceChart'),{
+    type:'line',
+    data:{labels:cps.map(d=>d===0?'月初':d===31?'月末':`${d}日`),datasets:[
+      {label:'平均ペース',data:avgLine,borderColor:'#ffa502',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:4,borderWidth:2,borderDash:[5,3]},
+      {label:'🟢 安全ライン',data:safeLine,borderColor:'#2ed573',backgroundColor:'rgba(46,213,115,0.1)',fill:true,tension:0.3,pointRadius:4,borderWidth:2},
+      {label:`🔴 目標 ¥${(target/10000).toFixed(0)}万`,data:limLine,borderColor:'#ff4757',backgroundColor:'transparent',fill:false,tension:0,pointRadius:0,borderWidth:1,borderDash:[3,3]},
+    ]},
+    options:{
+      plugins:{legend:{labels:{color:'#e8f4f8',font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ¥${ctx.raw?.toLocaleString()}`}}},
+      scales:{x:{ticks:{color:'#5a7a8a',font:{size:9}},grid:{color:'#1e2a35'}},y:{ticks:{color:'#5a7a8a',callback:v=>`¥${(v/10000).toFixed(0)}万`,font:{size:10}},grid:{color:'#1e2a35'},max:Math.round(target*1.2)}}
+    }
+  });
+  const tblEl=document.getElementById('paceTableRows');tblEl.innerHTML='';
+  paceCheckpoints.forEach((_,i)=>{
+    const strict=Math.round(target*strictRatios[i]);
+    const avg=Math.round(target*avgRatios[i]);
+    const row=document.createElement('div');row.className='pace-tbl-row';
+    row.innerHTML=`<span style="font-weight:700;font-size:0.82rem">${paceCheckpoints[i]}日</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--accent3);font-weight:700">¥${strict.toLocaleString()}</span><span style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--accent4)">¥${avg.toLocaleString()}</span><span style="text-align:right;font-size:0.72rem;color:var(--accent2)">🔴 超えたらブレーキ</span>`;
+    tblEl.appendChild(row);
+  });
+}
+
+renderTracker();
+renderPacePage(120000);
+</script>
+</body>
+</html>
